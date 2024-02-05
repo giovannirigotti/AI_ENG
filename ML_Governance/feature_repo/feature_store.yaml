@@ -1,0 +1,17 @@
+project: AIEngineer
+registry: 
+    registry_type: sql
+    path: postgresql://postgres:B1gdata-demo@mypostgres.kubegres:5432/postgres
+    cache_ttl_seconds: 60
+provider: local
+online_store:
+    type: postgres
+    host: mypostgres.kubegres
+    port: 5432
+    database: postgres
+    db_schema: feast
+    user: postgres
+    password: B1gdata-demo
+offline_store:
+  type: file
+entity_key_serialization_version: 2

@@ -1,0 +1,38 @@
+image: python:3.8
+
+stages:
+  - components
+  - launch_pipeline
+
+before_script:
+  - python --version  # For debugging
+  - pip install virtualenv
+  - virtualenv venv
+  - source venv/bin/activate
+  - pip install kfp==1.6.3 numpy==1.22.0 pandas==1.0.5 minio==6.0.2 scikit-learn==0.24.2 urllib3==1.26.11
+components:
+  stage: components
+  only:
+    refs:
+      - tags
+      - main
+  script:
+      - mkdir components
+      - python component_source/minio_get_data.py
+      - python component_source/preprocess.py
+      - python component_source/xgboost_training.py
+      - python component_source/xgboost_predict.py
+      - python component_source/minio_export_model.py
+
+  artifacts:
+    paths:
+      - components/*.yaml
+    
+launch_pipeline:
+  stage: launch_pipeline
+  only:
+    refs:
+      - tags
+      - main
+  script:
+    python pipeline_source/pipeline.py

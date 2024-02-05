@@ -1,0 +1,19 @@
+image: python:3.8
+
+before_script:
+  - python --version  # For debugging
+  - pip install virtualenv
+  - virtualenv venv
+  - source venv/bin/activate
+  - pip install kserve
+
+components:
+  only:
+    refs:
+      - tags
+      - main
+  script:
+    - python createinference.py
+
+
+

@@ -1,0 +1,87 @@
+name: Get data from minio
+inputs:
+- {name: minio_path, type: String}
+- {name: bucket, type: String}
+outputs:
+- {name: dest}
+implementation:
+  container:
+    image: python:3.8
+    command:
+    - sh
+    - -c
+    - (PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location
+      'numpy==1.21.6' 'minio==6.0.2' 'pandas==1.0.5' 'pyarrow==10.0.1' || PIP_DISABLE_PIP_VERSION_CHECK=1
+      python3 -m pip install --quiet --no-warn-script-location 'numpy==1.21.6' 'minio==6.0.2'
+      'pandas==1.0.5' 'pyarrow==10.0.1' --user) && "$0" "$@"
+    - sh
+    - -ec
+    - |
+      program_path=$(mktemp)
+      printf "%s" "$0" > "$program_path"
+      python3 -u "$program_path" "$@"
+    - |
+      def _make_parent_dirs_and_return_path(file_path: str):
+          import os
+          os.makedirs(os.path.dirname(file_path), exist_ok=True)
+          return file_path
+
+      def get_data_from_minio(
+          minio_path,
+          bucket,
+          dest_file_path,
+          ):
+
+          import numpy
+          from io import BytesIO
+          import pandas as pd
+          import urllib3
+          from minio import Minio
+          import os
+          import pyarrow
+
+          client = Minio(
+          "storage-api.course.aiengineer.codex-platform.com",
+          access_key=os.getenv("MINIO_ACCESS_KEY"),
+          secret_key=os.getenv("MINIO_SECRET_KEY"),
+              secure=True,
+              http_client=urllib3.PoolManager(
+
+              retries=urllib3.Retry(
+                  total=5,
+                  backoff_factor=0.2,
+                  status_forcelist=[500, 502, 503, 504],
+              ),
+          ),
+          )
+          buff = client.list_buckets()
+          for b in buff:
+              print(b.name)
+              # Get data from minio using get_object, decode it using BytesIO and read the parquet result with pandas
+          try:
+              response = client.get_object(bucket, minio_path)
+              print(response)
+              # Read data from response.
+              parquet_object=BytesIO(response.data)
+              data = pd.read_parquet(parquet_object)
+          finally:
+              response.close()
+              response.release_conn()
+          ### pass dataset to component output
+          data.to_parquet(dest_file_path)
+
+      import argparse
+      _parser = argparse.ArgumentParser(prog='Get data from minio', description='')
+      _parser.add_argument("--minio-path", dest="minio_path", type=str, required=True, default=argparse.SUPPRESS)
+      _parser.add_argument("--bucket", dest="bucket", type=str, required=True, default=argparse.SUPPRESS)
+      _parser.add_argument("--dest", dest="dest_file_path", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+      _parsed_args = vars(_parser.parse_args())
+
+      _outputs = get_data_from_minio(**_parsed_args)
+    args:
+    - --minio-path
+    - {inputValue: minio_path}
+    - --bucket
+    - {inputValue: bucket}
+    - --dest
+    - {outputPath: dest}
